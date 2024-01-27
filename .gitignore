@@ -1,3 +1,9 @@
+api_tokens.py
+*.jpg
+*.JPG
+*.png
+*.PNG
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
