@@ -125,12 +125,13 @@ image_types = ["Leaves Image", "Plant Image"]
 
 app_ui = ui.page_fluid(
     ui.column(12,
-        ui.panel_title("PlantPredict"),
+        ui.include_css("styles.css"),
+        ui.panel_title("🌱  PlantPredict  🌱"),
         ui.input_select("image_type", "Select Image Type", image_types),
         ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
         # output_widget("distributionBoxplot"),
         output_widget("projectionPlot"),
-        # ui.output_image("img"),
+        ui.output_image("img"),
         align="center",
     )
 )
@@ -152,10 +153,10 @@ def server(input, output, session):
     def _():
         if input.image_type() == image_types[0]:
             theseMasses, theseSegmentations = segmentImage(cv2.imread(parsed_file()))
-            segmentations.set(theseSegmentations)
         else:
             theseMasses = list(areaToMass(np.array(segment_plant_image(parsed_file()))))
         masses.set(theseMasses)
+        segmentations.set(cv2.imread(parsed_file()))
     
     # @output
     # @render_widget
@@ -216,7 +217,8 @@ def server(input, output, session):
     @output
     @render.image
     def img():
-        return imshow(segmentations())
+        if (segmentations() is not True):
+            return imshow(segmentations())
 
 app = App(app_ui, server)
 app.run()

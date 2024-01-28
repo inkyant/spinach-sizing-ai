@@ -1,0 +1,22 @@
+
+body {
+    background-color: lightcyan;
+}
+
+h2 {
+    margin: 20px;
+}
+
+#projectionPlot {
+    margin: 20px;
+}
+
+.progress-bar { 
+    height: 100%;
+}
+
+#img > img {
+    width: 80vw;
+    height: auto;
+    margin: 20px;
+}
