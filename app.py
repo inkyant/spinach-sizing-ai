@@ -169,10 +169,10 @@ def server(input, output, session):
     def _():
         if input.image_type() == "Leaf Image":
             theseMasses, theseSegmentations = segmentImage(cv2.imread(parsed_file()))
+            segmentations.set(theseSegmentations)
         else:
-            theseMasses, theseSegmentations = segment_plant_image(parsed_file())
+            theseMasses = segment_plant_image(parsed_file())
         masses.set(theseMasses)
-        segmentations.set(theseSegmentations)
     
     # @output
     # @render_widget
