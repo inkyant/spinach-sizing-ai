@@ -37,7 +37,7 @@ def growthfunc(size, month):
     return(5*(1+(0.0046)*current_month_dli))
 
 def grade(x):
-    gradeCutoffsg = [0.3, 0.7]
+    gradeCutoffsg = [2, 4]
     if(x <= gradeCutoffsg[0]):
         return("small")
     if(x < gradeCutoffsg[1]):
@@ -136,28 +136,31 @@ def imshow(image):
     imgBuffer: ImgData = {"src": str(dir / 'buffer.jpg')}
     return imgBuffer
 
+
+#####################
 # ui and server code --------------------------------------------------------------------------------------------------------
+#####################
+
 
 app_ui = ui.page_fluid(
+    ui.input_select("image_type", "Select Image Type", ["Leaf Image", "Plant Image"]),
     ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
     # output_widget("distributionBoxplot"),
     output_widget("projectionPlot"),
-    ui.output_image("img"),
+    # ui.output_image("img"),
 )
 
 def server(input, output, session):
+
+    masses = reactive.Value(True)
+    segmentations = reactive.Value(True)
 
     @reactive.Calc
     def parsed_file():
         file: list[FileInfo] | None = input.imageFile()
         if file is None:
             return None
-        return cv2.imread(
-            file[0]["datapath"]
-        )
-    
-    masses = reactive.Value(True)
-    segmentations = reactive.Value(True)
+        return cv2.imread(file[0]["datapath"])
 
     @reactive.Effect
     @reactive.event(input.imageFile)
@@ -180,16 +183,25 @@ def server(input, output, session):
     def projectionPlot():
         base = datetime.datetime.today()
         dates = [base + datetime.timedelta(days = x) for x in range(14)]
-        if(masses() == True):
+
+        if (masses() == True):
             return px.line(x = dates, y = np.array([0 for i in range(14)]), labels = dict(y = "Baby leaf yield (g)"))
+
         theseMasses = masses()
+
+        print(theseMasses)
+
         distributions = pd.DataFrame(columns=['Date', 'Mass', 'Baby Mass'])
-        for i, date in enumerate(dates):
-            for j in range(len(theseMasses)):
-                distributions.loc[len(distributions.index)] = [date, theseMasses[j], theseMasses[j] * int(grade(theseMasses[j]) == "baby")]
-                theseMasses[j] = incrementSize(date, theseMasses[j])
+
+        for date in dates:
+            for i, mass in enumerate(theseMasses):
+                if grade(mass) == "baby":
+                    distributions.loc[len(distributions.index)] = [date, mass, mass]
+                theseMasses[i] = incrementSize(date, mass)
+        
         averages = distributions.groupby(distributions['Date'].dt.date).mean()
         # print(np.array([grade(i) for i in distributions[['Mass']]]))
+
         fig = px.scatter(distributions, x = "Date", y = 'Baby Mass', labels = dict(y = "Baby leaf yield (g))"))
         fig = fig.add_trace(
             go.Scatter(
