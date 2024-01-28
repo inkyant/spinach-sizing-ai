@@ -1,7 +1,6 @@
-import json
+
 import requests
 from datetime import datetime, timedelta
-import calendar
 
 URL = "https://dli.suntrackertech.com:8443/DLI/api/get_DLI/"
 longitude = "38"
@@ -11,7 +10,7 @@ data = r.json()
 
 def growthfunc(size, month):
     current_month = month
-    next_month = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%B'),
+    next_month = (datetime.now() + timedelta(days=30)).strftime('%B'),
     current_month_dli, next_month_dli = None, None
     for entry in data:
         if entry['month'] == current_month:

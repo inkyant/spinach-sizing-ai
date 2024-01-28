@@ -1,23 +1,15 @@
-from __future__ import annotations
-
 from shiny import *
 from shiny.types import FileInfo, ImgData
-from shinywidgets import output_widget, render_widget, register_widget
+from shinywidgets import output_widget, render_widget
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import cv2
-import os
 import math
-from itertools import compress
-from scipy.stats import mode
-from scipy.spatial import cKDTree, distance_matrix
 from scipy.spatial.distance import cdist
 import plotly.graph_objs as go
 import plotly.express as px
 import datetime
-import json
-import requests
 import calendar
 from growthfunc import growthfunc
 
