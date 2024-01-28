@@ -4,7 +4,7 @@ import requests, json
 from io import BytesIO
 
 
-def segment_image(file_path):
+def segment_plant_image(file_path):
 
     r = requests.post('http://34.69.61.109:3003/', files={'image': open(file_path, 'rb')})
 
@@ -29,6 +29,6 @@ def segment_image(file_path):
 
 if __name__ == '__main__':
     
-    for a in segment_image('downscaled_IMG_0494.JPG'):
+    for a in segment_plant_image('downscaled_IMG_0494.JPG'):
         print("%.3f" % a)
 

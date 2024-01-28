@@ -18,6 +18,8 @@ import json
 import requests
 import calendar
 
+from segment_image import segment_plant_image
+
 # rsconnect deploy shiny "/Users/mtwatson/Desktop/hackathon app" --name mtwatson --title sizing
 
 def growthfunc(size, month):
@@ -160,12 +162,15 @@ def server(input, output, session):
         file: list[FileInfo] | None = input.imageFile()
         if file is None:
             return None
-        return cv2.imread(file[0]["datapath"])
+        return file[0]["datapath"]
 
     @reactive.Effect
     @reactive.event(input.imageFile)
     def _():
-        theseMasses, theseSegmentations = segmentImage(parsed_file())
+        if input.image_type() == "Leaf Image":
+            theseMasses, theseSegmentations = segmentImage(cv2.imread(parsed_file()))
+        else:
+            theseMasses, theseSegmentations = segment_plant_image(parsed_file())
         masses.set(theseMasses)
         segmentations.set(theseSegmentations)
     
