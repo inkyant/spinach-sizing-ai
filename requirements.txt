@@ -1,3 +1,6 @@
 replicate
 cloudinary
 opencv-python
+shiny
+plotly
+shinywidgets
