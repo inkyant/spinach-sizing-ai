@@ -71,10 +71,13 @@ def meanNonBlackColor(image):
 def incrementSize(date, massg):
     return massg + 0.1
 
-def segmentImage(image):
-    knownQuarterAreacm2 = 4.62244 # https://en.wikipedia.org/wiki/Quarter_(United_States_coin)
+def areaToMass(area):
     leafThicknesscm = 0.05 # https://onlinelibrary.wiley.com/doi/full/10.1002/jsfa.5780
     leafDensitygcm3 = 1
+    return area * leafThicknesscm * leafDensitygcm3
+
+def segmentImage(image):
+    knownQuarterAreacm2 = 4.62244 # https://en.wikipedia.org/wiki/Quarter_(United_States_coin)
     thres = image
     thres = cv2.resize(image, None, fx = 0.25, fy = 0.25)
     thres = cv2.blur(thres, (10, 10))  
@@ -124,9 +127,8 @@ def segmentImage(image):
             # import datetime
             # cv2.imwrite("/Users/mtwatson/Desktop/training images/" + str(datetime.datetime.now()) + ".jpg", leaf)
             
-            sizecm2 = area * (knownQuarterAreacm2 / knownQuarterAreaPixels)
-            volumecm3 = sizecm2 * leafThicknesscm 
-            massg = volumecm3 * leafDensitygcm3
+            sizecm2 = area * (knownQuarterAreacm2 / knownQuarterAreaPixels) 
+            massg = areaToMass(sizecm2)
             leaves.append(leaf)
             masses.append(massg)
 
@@ -145,11 +147,15 @@ def imshow(image):
 
 
 app_ui = ui.page_fluid(
-    ui.input_select("image_type", "Select Image Type", ["Leaf Image", "Plant Image"]),
-    ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
-    # output_widget("distributionBoxplot"),
-    output_widget("projectionPlot"),
-    # ui.output_image("img"),
+    ui.column(12,
+        ui.panel_title("PlantPredict"),
+        ui.input_select("image_type", "Select Image Type", ["Leaves Image", "Plant Image"]),
+        ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
+        # output_widget("distributionBoxplot"),
+        output_widget("projectionPlot"),
+        # ui.output_image("img"),
+        align="center",
+    )
 )
 
 def server(input, output, session):
@@ -171,7 +177,7 @@ def server(input, output, session):
             theseMasses, theseSegmentations = segmentImage(cv2.imread(parsed_file()))
             segmentations.set(theseSegmentations)
         else:
-            theseMasses = segment_plant_image(parsed_file())
+            theseMasses = list(areaToMass(np.array(segment_plant_image(parsed_file()))))
         masses.set(theseMasses)
     
     # @output
@@ -190,33 +196,33 @@ def server(input, output, session):
         dates = [base + datetime.timedelta(days = x) for x in range(14)]
 
         if (masses() == True):
-            return px.line(x = dates, y = np.array([0 for i in range(14)]), labels = dict(y = "Baby leaf yield (g)"))
+            return px.line(x = dates, y = np.array([0 for i in range(14)]), labels = dict(x = "Date", y = "Baby leaf yield (g)"))
 
         theseMasses = masses()
 
-        print(theseMasses)
-
-        distributions = pd.DataFrame(columns=['Date', 'Mass', 'Baby Mass'])
+        distributions = pd.DataFrame(columns=['Date', 'Baby Mass'])
 
         for date in dates:
             for i, mass in enumerate(theseMasses):
                 if grade(mass) == "baby":
-                    distributions.loc[len(distributions.index)] = [date, mass, mass]
+                    distributions.loc[len(distributions.index)] = [date, mass]
                 theseMasses[i] = incrementSize(date, mass)
-        
+
+        if distributions.empty:
+            print("distribution is empty")
+            return
+
         averages = distributions.groupby(distributions['Date'].dt.date).mean()
         # print(np.array([grade(i) for i in distributions[['Mass']]]))
 
-        fig = px.scatter(distributions, x = "Date", y = 'Baby Mass', labels = dict(y = "Baby leaf yield (g))"))
-        fig = fig.add_trace(
-            go.Scatter(
-                x=distributions[["Date"]],
-                y=distributions[["Baby Mass"]],
-                mode="lines",
-                line=go.scatter.Line(color="black"),
-                showlegend=False)
-        )
-        return fig
+        fig1 = px.line(averages, x="Date", y="Baby Mass", labels = dict(x = "Date", y = "Baby leaf yield (g)"))
+        fig1.update_traces(line=dict(color = 'rgba(9, 232, 69, 1)', width=8))
+
+        fig2 = px.scatter(distributions, x="Date", y="Baby Mass", labels = dict(x = "Date", y = "Baby leaf yield (g)"))
+
+        fig3 = go.Figure(data=fig1.data + fig2.data)
+
+        return fig3
 
     @output
     @render.image
