@@ -19,25 +19,11 @@ import datetime
 import json
 import requests
 import calendar
+from growthfunc import growthfunc
 
 from segment_image import segment_plant_image
 
 # rsconnect deploy shiny "/Users/mtwatson/Desktop/hackathon app" --name mtwatson --title sizing
-URL = "https://dli.suntrackertech.com:8443/DLI/api/get_DLI/"
-longitude = "38"
-latitude = "21"
-r = requests.get(url=(URL + longitude + "," + latitude))
-data = r.json()
-def growthfunc(size, month):
-    current_month = month
-    next_month = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%B'),
-    current_month_dli, next_month_dli = None, None
-    for entry in data:
-        if entry['month'] == current_month:
-            current_month_dli = entry['dli_val']
-        elif entry['month'] == next_month:
-            next_month_dli = entry['dli_val']
-    return(size*(1+(0.0046)*current_month_dli))
 
 def grade(x):
     gradeCutoffsg = [3, 5]
@@ -68,9 +54,6 @@ def cropSquareFromContour(c, img):
 def meanNonBlackColor(image):
     indices = np.array([np.any(pixel != [0, 0, 0], axis=-1) for pixel in image])
     return np.mean(np.array(image[indices]), axis=0)
-
-def incrementSize(date, massg):
-    return massg + 0.1
 
 def areaToMass(area):
     leafThicknesscm = 0.05 # https://onlinelibrary.wiley.com/doi/full/10.1002/jsfa.5780
