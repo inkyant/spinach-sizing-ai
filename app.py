@@ -146,11 +146,12 @@ def imshow(image):
 # ui and server code --------------------------------------------------------------------------------------------------------
 #####################
 
+image_types = ["Leaves Image", "Plant Image"]
 
 app_ui = ui.page_fluid(
     ui.column(12,
         ui.panel_title("PlantPredict"),
-        ui.input_select("image_type", "Select Image Type", ["Leaves Image", "Plant Image"]),
+        ui.input_select("image_type", "Select Image Type", image_types),
         ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
         # output_widget("distributionBoxplot"),
         output_widget("projectionPlot"),
@@ -174,7 +175,7 @@ def server(input, output, session):
     @reactive.Effect
     @reactive.event(input.imageFile)
     def _():
-        if input.image_type() == "Leaf Image":
+        if input.image_type() == image_types[0]:
             theseMasses, theseSegmentations = segmentImage(cv2.imread(parsed_file()))
             segmentations.set(theseSegmentations)
         else:
@@ -197,7 +198,7 @@ def server(input, output, session):
         dates = [base + datetime.timedelta(days = x) for x in range(14)]
 
         if (masses() == True):
-            return px.line(x = dates, y = np.array([0 for i in range(14)]), labels = dict(x = "Date", y = "Baby leaf yield (g)"))
+            return
 
         theseMasses = masses()
 
@@ -213,7 +214,19 @@ def server(input, output, session):
             print("distribution is empty")
             return
 
-        averages = distributions.groupby(distributions['Date'].dt.date).mean()
+        # to find average
+        # averages = distributions.groupby(distributions['Date'].dt.date).sum()
+        
+        # or instead find sum:
+        # have to mess around with the Date becomeing the index due
+        # to sum function not liking date objects.
+        averages = distributions.groupby('Date').sum()
+        averages.insert(1, "Date", [x for x in averages.index])
+        averages.index = (a for a in range(averages.shape[0]))
+
+        # scale axis of the mass.
+        averages.loc[:, "Baby Mass"] = averages.loc[:, "Baby Mass"] / 5
+
         # print(np.array([grade(i) for i in distributions[['Mass']]]))
 
         fig1 = px.line(averages, x="Date", y="Baby Mass", labels = dict(x = "Date", y = "Baby leaf yield (g)"))
