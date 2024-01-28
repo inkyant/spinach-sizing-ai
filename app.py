@@ -40,7 +40,7 @@ def growthfunc(size, month):
     return(size*(1+(0.0046)*current_month_dli))
 
 def grade(x):
-    gradeCutoffsg = [2, 4]
+    gradeCutoffsg = [3, 5]
     if(x <= gradeCutoffsg[0]):
         return("small")
     if(x < gradeCutoffsg[1]):
