@@ -126,7 +126,7 @@ image_types = ["Leaves Image", "Plant Image"]
 app_ui = ui.page_fluid(
     ui.column(12,
         ui.include_css("styles.css"),
-        ui.panel_title("🌱  PlantPredict  🌱"),
+        ui.panel_title("🌱  Goldilocks  🌱"),
         ui.input_select("image_type", "Select Image Type", image_types),
         ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
         # output_widget("distributionBoxplot"),
