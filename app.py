@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from shiny import *
-from shiny.types import FileInfo
+from shiny.types import FileInfo, ImgData
 from shinywidgets import output_widget, render_widget, register_widget
 from pathlib import Path
 import pandas as pd
@@ -21,13 +23,12 @@ import calendar
 from segment_image import segment_plant_image
 
 # rsconnect deploy shiny "/Users/mtwatson/Desktop/hackathon app" --name mtwatson --title sizing
-
+URL = "https://dli.suntrackertech.com:8443/DLI/api/get_DLI/"
+longitude = "38"
+latitude = "21"
+r = requests.get(url=(URL + longitude + "," + latitude))
+data = r.json()
 def growthfunc(size, month):
-    URL = "https://dli.suntrackertech.com:8443/DLI/api/get_DLI/"
-    longitude = "38"
-    latitude = "21"
-    r = requests.get(url=(URL + longitude + "," + latitude))
-    data = r.json()
     current_month = month
     next_month = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%B'),
     current_month_dli, next_month_dli = None, None
@@ -36,7 +37,7 @@ def growthfunc(size, month):
             current_month_dli = entry['dli_val']
         elif entry['month'] == next_month:
             next_month_dli = entry['dli_val']
-    return(5*(1+(0.0046)*current_month_dli))
+    return(size*(1+(0.0046)*current_month_dli))
 
 def grade(x):
     gradeCutoffsg = [2, 4]
@@ -206,7 +207,7 @@ def server(input, output, session):
             for i, mass in enumerate(theseMasses):
                 if grade(mass) == "baby":
                     distributions.loc[len(distributions.index)] = [date, mass]
-                theseMasses[i] = incrementSize(date, mass)
+                theseMasses[i] = growthfunc(mass, calendar.month_name[date.month])
 
         if distributions.empty:
             print("distribution is empty")
