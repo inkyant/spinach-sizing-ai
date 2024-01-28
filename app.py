@@ -1,21 +1,49 @@
 from shiny import *
 from shiny.types import FileInfo
+from shinywidgets import output_widget, render_widget, register_widget
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import cv2
 import os
 import math
-import matplotlib.pyplot as plt
 from itertools import compress
 from scipy.stats import mode
 from scipy.spatial import cKDTree, distance_matrix
 from scipy.spatial.distance import cdist
 import plotly.graph_objs as go
 import plotly.express as px
-from shinywidgets import output_widget, register_widget
+import datetime
+import json
+import requests
+import calendar
 
-# rsconnect deploy shiny /Users/mtwatson/Desktop/hackathon/app --name mtwatson --title leafSizing
+# rsconnect deploy shiny "/Users/mtwatson/Desktop/hackathon app" --name mtwatson --title sizing
+
+def growthfunc(size, month):
+    URL = "https://dli.suntrackertech.com:8443/DLI/api/get_DLI/"
+    longitude = "38"
+    latitude = "21"
+    r = requests.get(url=(URL + longitude + "," + latitude))
+    data = r.json()
+    current_month = month
+    next_month = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%B'),
+    current_month_dli, next_month_dli = None, None
+    for entry in data:
+        if entry['month'] == current_month:
+            current_month_dli = entry['dli_val']
+        elif entry['month'] == next_month:
+            next_month_dli = entry['dli_val']
+    return(5*(1+(0.0046)*current_month_dli))
+
+def grade(x):
+    gradeCutoffsg = [0.3, 0.7]
+    if(x <= gradeCutoffsg[0]):
+        return("small")
+    if(x < gradeCutoffsg[1]):
+        return("baby")
+    if(x >= gradeCutoffsg[1]):
+        return("bunching")
 
 def cropSquareFromContour(c, img):
     rect = cv2.minAreaRect(c)
@@ -38,8 +66,13 @@ def meanNonBlackColor(image):
     indices = np.array([np.any(pixel != [0, 0, 0], axis=-1) for pixel in image])
     return np.mean(np.array(image[indices]), axis=0)
 
+def incrementSize(date, massg):
+    return massg + 0.1
+
 def segmentImage(image):
-    knownQuarterAreacm2 = 4.62244
+    knownQuarterAreacm2 = 4.62244 # https://en.wikipedia.org/wiki/Quarter_(United_States_coin)
+    leafThicknesscm = 0.05 # https://onlinelibrary.wiley.com/doi/full/10.1002/jsfa.5780
+    leafDensitygcm3 = 1
     thres = image
     thres = cv2.resize(image, None, fx = 0.25, fy = 0.25)
     thres = cv2.blur(thres, (10, 10))  
@@ -50,7 +83,7 @@ def segmentImage(image):
     kernel = np.ones((9, 9), np.uint8)
     thres = cv2.morphologyEx(thres, cv2.MORPH_OPEN, kernel)
     thres = cv2.resize(thres, None, fx = 4, fy = 4)
-    contours, hierarchy = cv2.findContours(thres, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(thres, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     knownQuarterAreaPixels = 0
     for i, contour in enumerate(contours):
@@ -69,6 +102,7 @@ def segmentImage(image):
                 knownQuarterAreaPixels = area
 
     leaves = []
+    masses = []
     for i, contour in enumerate(contours):
         rect = cv2.minAreaRect(contour)
         rectArea = rect[1][0] * rect[1][1]
@@ -79,15 +113,22 @@ def segmentImage(image):
             leaf = cropSquareFromContour(contour, image)
             leaf[(255 - leafMask).astype("bool"), :] = [0,0,0]
             leaf[(255 - cropSquareFromContour(contour, thres)).astype("bool"), :] = [0,0,0]
-            leaf = cv2.resize(leaf, (100,100))
+            leaf = cv2.resize(leaf, (224,224))
             meanColor = np.round(meanNonBlackColor(leaf)).astype(int)
 
             area = cv2.contourArea(contour)
-            # if(np.mean(meanColor - [40, 70, 60])) < 15:
-            leafSizecm2 = area * (knownQuarterAreacm2 / knownQuarterAreaPixels)
+
+            # filter leaves based on CNN classifier - code below is to train it
+            # import datetime
+            # cv2.imwrite("/Users/mtwatson/Desktop/training images/" + str(datetime.datetime.now()) + ".jpg", leaf)
+            
+            sizecm2 = area * (knownQuarterAreacm2 / knownQuarterAreaPixels)
+            volumecm3 = sizecm2 * leafThicknesscm 
+            massg = volumecm3 * leafDensitygcm3
             leaves.append(leaf)
-                
-    return(cv2.vconcat(leaves))
+            masses.append(massg)
+
+    return masses, cv2.resize(thres, None, fx = 0.25, fy = 0.25) # cv2.vconcat(leaves)
 
 def imshow(image):
     dir = Path(__file__).resolve().parent
@@ -95,13 +136,17 @@ def imshow(image):
     imgBuffer: ImgData = {"src": str(dir / 'buffer.jpg')}
     return imgBuffer
 
+# ui and server code --------------------------------------------------------------------------------------------------------
+
 app_ui = ui.page_fluid(
     ui.input_file("imageFile", "Take image", accept=["image/*"], multiple=False, capture='environment'),
-    ui.output_image("img")
+    # output_widget("distributionBoxplot"),
+    output_widget("projectionPlot"),
+    ui.output_image("img"),
 )
 
 def server(input, output, session):
-    print(imshow)
+
     @reactive.Calc
     def parsed_file():
         file: list[FileInfo] | None = input.imageFile()
@@ -110,14 +155,56 @@ def server(input, output, session):
         return cv2.imread(
             file[0]["datapath"]
         )
+    
+    masses = reactive.Value(True)
+    segmentations = reactive.Value(True)
+
+    @reactive.Effect
+    @reactive.event(input.imageFile)
+    def _():
+        theseMasses, theseSegmentations = segmentImage(parsed_file())
+        masses.set(theseMasses)
+        segmentations.set(theseSegmentations)
+    
+    # @output
+    # @render_widget
+    # def distributionBoxplot():
+    #     if(masses() == True):
+    #         return px.box(y = [0], labels = dict(y = "Individual leaf mass (g)"))
+    #     df = px.data.tips()
+    #     fig = px.box(y = masses(), points="all", labels=dict(y = "Individual leaf mass (g)"))
+    #     return fig
+    
+    @output
+    @render_widget
+    def projectionPlot():
+        base = datetime.datetime.today()
+        dates = [base + datetime.timedelta(days = x) for x in range(14)]
+        if(masses() == True):
+            return px.line(x = dates, y = np.array([0 for i in range(14)]), labels = dict(y = "Baby leaf yield (g)"))
+        theseMasses = masses()
+        distributions = pd.DataFrame(columns=['Date', 'Mass', 'Baby Mass'])
+        for i, date in enumerate(dates):
+            for j in range(len(theseMasses)):
+                distributions.loc[len(distributions.index)] = [date, theseMasses[j], theseMasses[j] * int(grade(theseMasses[j]) == "baby")]
+                theseMasses[j] = incrementSize(date, theseMasses[j])
+        averages = distributions.groupby(distributions['Date'].dt.date).mean()
+        # print(np.array([grade(i) for i in distributions[['Mass']]]))
+        fig = px.scatter(distributions, x = "Date", y = 'Baby Mass', labels = dict(y = "Baby leaf yield (g))"))
+        fig = fig.add_trace(
+            go.Scatter(
+                x=distributions[["Date"]],
+                y=distributions[["Baby Mass"]],
+                mode="lines",
+                line=go.scatter.Line(color="black"),
+                showlegend=False)
+        )
+        return fig
 
     @output
     @render.image
     def img():
-        image = parsed_file()
-        image = segmentImage(image)
-
-        return(imshow(image))
+        return imshow(segmentations())
 
 app = App(app_ui, server)
 app.run()
